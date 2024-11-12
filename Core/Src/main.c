@@ -33,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+//#define CRC_16 0xFFFF
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -76,7 +76,69 @@ void MX_USB_HOST_Process(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+typedef struct WheelSystemState{
+	int rotation;
+	bool left_arr;
+	bool right_arr;
+	bool up_arr;
+	bool down_arr;
 
+	bool a_butt;
+	bool b_butt;
+	bool x_butt;
+	bool y_butt;
+
+	bool dl_butt;
+	bool dr_butt;
+
+	bool r_shift;
+	bool l_shift;
+
+	int acceleration;
+	int breaking;
+};
+void calc_crc16_checksum(WheelSystemState* state, uint8_t* buffer){
+	uint16_t crc = 0xFFFF;
+	for (int i = 1; i <= 7; i++){
+		crc ^= buffer[i];
+		for (int j =0; j<8;j++){
+			if(crc & 0x0001){
+				crc >>=1;
+				crc ^=0xA001;
+			}else{
+				crc >>=1;
+			}
+		}
+	}
+	buffer[8] = crc & 0xFF;
+	buffer[9] = (crc >> 8);
+}
+
+void send_to_pc(WheelSystemState* state){
+	state->acceleration=0;
+	state->breaking=0; // TODO read actual values
+	uint8_t buffer[10];
+	buffer[0] = 0x69;
+	buffer[4] = 0;
+	buffer[4] += (state->left_arr)?1:0;
+	buffer[4] += (state->right_arr)?2:0;
+	buffer[4] += (state->up_arr)?4:0;
+	buffer[4] += (state->down_arr)?8:0;
+	buffer[4] += (state->a_butt)?16:0;
+	buffer[4] += (state->b_butt)?32:0;
+	buffer[4] += (state->x_butt)?64:0;
+	buffer[4] += (state->y_butt)?128:0;
+	buffer[5] = 0;
+	buffer[5] += (state->dl_butt)?1:0;
+	buffer[5] += (state->dr_butt)?2:0;
+	buffer[5] += (state->r_shift)?4:0;
+	buffer[5] += (state->l_shift)?8:0;
+	buffer[6] = state->acceleration;
+	buffer[7] = state->breaking;
+
+	calc_crc16_checksum(state, buffer);
+
+ }
 /* USER CODE END 0 */
 
 /**
@@ -138,27 +200,7 @@ int main(void)
   uint8_t r_shift = 0;
   uint8_t l_shift = 0;
 
-  struct WheelSystemState{
-	int rotation;
-	bool left_arr;
-	bool right_arr;
-	bool up_arr;
-	bool down_arr;
 
-	bool a_butt;
-	bool b_butt;
-	bool x_butt;
-	bool y_butt;
-
-	bool dl_butt;
-	bool dr_butt;
-
-	bool r_shift;
-	bool l_shift;
-
-	int acceleration;
-	int breaking;
-  };
 
   /* USER CODE END 2 */
 
