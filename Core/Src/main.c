@@ -213,6 +213,8 @@ int main(void)
 	wheel_state.r_shift = r_shift;
 	wheel_state.l_shift = l_shift;
 
+	printf("ІВАНЕ, ЛОВИ");
+
     HAL_ADC_Stop(&hadc1);
     HAL_Delay(50);
   }
