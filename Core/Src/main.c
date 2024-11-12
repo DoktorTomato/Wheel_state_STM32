@@ -97,7 +97,7 @@ typedef struct WheelSystemState{
 	int acceleration;
 	int breaking;
 };
-void calc_crc16_checksum(WheelSystemState* state, uint8_t* buffer){
+void calc_crc16_checksum(uint8_t* buffer){
 	uint16_t crc = 0xFFFF;
 	for (int i = 1; i <= 7; i++){
 		crc ^= buffer[i];
@@ -114,29 +114,34 @@ void calc_crc16_checksum(WheelSystemState* state, uint8_t* buffer){
 	buffer[9] = (crc >> 8);
 }
 
-void send_to_pc(WheelSystemState* state){
-	state->acceleration=0;
-	state->breaking=0; // TODO read actual values
+void send_to_pc(struct WheelSystemState state){
+	state.acceleration=0;
+	state.breaking=0; // TODO read actual values
 	uint8_t buffer[10];
 	buffer[0] = 0x69;
 	buffer[4] = 0;
-	buffer[4] += (state->left_arr)?1:0;
-	buffer[4] += (state->right_arr)?2:0;
-	buffer[4] += (state->up_arr)?4:0;
-	buffer[4] += (state->down_arr)?8:0;
-	buffer[4] += (state->a_butt)?16:0;
-	buffer[4] += (state->b_butt)?32:0;
-	buffer[4] += (state->x_butt)?64:0;
-	buffer[4] += (state->y_butt)?128:0;
+	buffer[1] = 0x0;
+	buffer[2] = state.rotation & 0xFF;
+	buffer[3] = (state.rotation >> 8);
+	buffer[4] += (state.left_arr)?1:0;
+	buffer[4] += (state.right_arr)?2:0;
+	buffer[4] += (state.up_arr)?4:0;
+	buffer[4] += (state.down_arr)?8:0;
+	buffer[4] += (state.a_butt)?16:0;
+	buffer[4] += (state.b_butt)?32:0;
+	buffer[4] += (state.x_butt)?64:0;
+	buffer[4] += (state.y_butt)?128:0;
 	buffer[5] = 0;
-	buffer[5] += (state->dl_butt)?1:0;
-	buffer[5] += (state->dr_butt)?2:0;
-	buffer[5] += (state->r_shift)?4:0;
-	buffer[5] += (state->l_shift)?8:0;
-	buffer[6] = state->acceleration;
-	buffer[7] = state->breaking;
+	buffer[5] += (state.dl_butt)?1:0;
+	buffer[5] += (state.dr_butt)?2:0;
+	buffer[5] += (state.r_shift)?4:0;
+	buffer[5] += (state.l_shift)?8:0;
+	buffer[6] = state.acceleration;
+	buffer[7] = state.breaking;
 
-	calc_crc16_checksum(state, buffer);
+	calc_crc16_checksum(buffer);
+
+	HAL_UART_Transmit(&huart1, buffer, 10, 30);
 
  }
 /* USER CODE END 0 */
@@ -260,6 +265,7 @@ int main(void)
 	wheel_state.breaking = 0;
 
 	printf("ІВАНЕ, ЛОВИ");
+	send_to_pc(wheel_state);
 
     HAL_ADC_Stop(&hadc1);
     HAL_Delay(50);
