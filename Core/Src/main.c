@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_host.h"
+#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -139,21 +140,21 @@ int main(void)
 
   struct WheelSystemState{
 	int rotation;
-	uint8_t left_arr;
-	uint8_t right_arr;
-	uint8_t up_arr;
-	uint8_t down_arr;
+	bool left_arr;
+	bool right_arr;
+	bool up_arr;
+	bool down_arr;
 
-	uint8_t a_butt;
-	uint8_t b_butt;
-	uint8_t x_butt;
-	uint8_t y_butt;
+	bool a_butt;
+	bool b_butt;
+	bool x_butt;
+	bool y_butt;
 
-	uint8_t dl_butt;
-	uint8_t dr_butt;
+	bool dl_butt;
+	bool dr_butt;
 
-	uint8_t r_shift;
-	uint8_t l_shift;
+	bool r_shift;
+	bool l_shift;
 
 	int acceleration;
 	int breaking;
@@ -197,21 +198,24 @@ int main(void)
 
 	wheel_state.rotation = analog_val;
 
-	wheel_state.a_butt = (a_butt==0)?1:0;
-	wheel_state.b_butt = (b_butt==0)?1:0;
-	wheel_state.x_butt = (x_butt==0)?1:0;
-	wheel_state.y_butt = (y_butt==0)?1:0;
+	wheel_state.a_butt = (a_butt==0)?true:false;
+	wheel_state.b_butt = (b_butt==0)?true:false;
+	wheel_state.x_butt = (x_butt==0)?true:false;
+	wheel_state.y_butt = (y_butt==0)?true:false;
 
-	wheel_state.up_arr = (up==0)?1:0;
-	wheel_state.down_arr = (down==0)?1:0;
-	wheel_state.right_arr = (right==0)?1:0;
-	wheel_state.left_arr = (left==0)?1:0;
+	wheel_state.up_arr = (up==0)?true:false;
+	wheel_state.down_arr = (down==0)?true:false;
+	wheel_state.right_arr = (right==0)?true:false;
+	wheel_state.left_arr = (left==0)?true:false;
 
-	wheel_state.dl_butt = (dl_butt==0)?1:0;
-	wheel_state.dr_butt = (dr_butt==0)?1:0;
+	wheel_state.dl_butt = (dl_butt==0)?true:false;
+	wheel_state.dr_butt = (dr_butt==0)?true:false;
 
-	wheel_state.r_shift = r_shift;
-	wheel_state.l_shift = l_shift;
+	wheel_state.r_shift = (r_shift==1)?true:false;
+	wheel_state.l_shift = (l_shift==1)?true:false;
+
+	wheel_state.acceleration = 0;
+	wheel_state.breaking = 0;
 
 	printf("ІВАНЕ, ЛОВИ");
 
