@@ -76,7 +76,7 @@ void MX_USB_HOST_Process(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-typedef struct WheelSystemState{
+typedef struct __attribute__((packed)){
 	int rotation;
 	bool left_arr;
 	bool right_arr;
@@ -96,11 +96,32 @@ typedef struct WheelSystemState{
 
 	int acceleration;
 	int breaking;
-};
-void calc_crc16_checksum(uint8_t* buffer){
+} WheelSystemState;
+uint16_t get_i(WheelSystemState buffer, int i){
+	switch(i){
+	case 0: return buffer.rotation;
+	case 1: return (uint16_t)buffer.left_arr;
+	case 2: return (uint16_t)buffer.right_arr;
+	case 3: return (uint16_t)buffer.up_arr;
+	case 4: return (uint16_t)buffer.down_arr;
+	case 5: return (uint16_t)buffer.a_butt;
+	case 6: return (uint16_t)buffer.b_butt;
+	case 7: return (uint16_t)buffer.x_butt;
+	case 8: return (uint16_t)buffer.y_butt;
+	case 9: return (uint16_t)buffer.dl_butt;
+	case 10: return (uint16_t)buffer.dr_butt;
+	case 11: return (uint16_t)buffer.r_shift;
+	case 12: return (uint16_t)buffer.l_shift;
+	case 13: return buffer.acceleration;
+	case 14: return buffer.breaking;
+
+	}
+}
+
+uint16_t calc_crc16_checksum(WheelSystemState buffer){
 	uint16_t crc = 0xFFFF;
 	for (int i = 1; i <= 7; i++){
-		crc ^= buffer[i];
+		crc ^= get_i(buffer, i);
 		for (int j =0; j<8;j++){
 			if(crc & 0x0001){
 				crc >>=1;
@@ -110,38 +131,58 @@ void calc_crc16_checksum(uint8_t* buffer){
 			}
 		}
 	}
-	buffer[8] = crc & 0xFF;
-	buffer[9] = (crc >> 8);
+	return crc;
 }
 
-void send_to_pc(struct WheelSystemState state){
-	state.acceleration=0;
-	state.breaking=0; // TODO read actual values
-	uint8_t buffer[10];
-	buffer[0] = 0x69;
-	buffer[4] = 0;
-	buffer[1] = 0x0;
-	buffer[2] = state.rotation & 0xFF;
-	buffer[3] = (state.rotation >> 8);
-	buffer[4] += (state.left_arr)?1:0;
-	buffer[4] += (state.right_arr)?2:0;
-	buffer[4] += (state.up_arr)?4:0;
-	buffer[4] += (state.down_arr)?8:0;
-	buffer[4] += (state.a_butt)?16:0;
-	buffer[4] += (state.b_butt)?32:0;
-	buffer[4] += (state.x_butt)?64:0;
-	buffer[4] += (state.y_butt)?128:0;
-	buffer[5] = 0;
-	buffer[5] += (state.dl_butt)?1:0;
-	buffer[5] += (state.dr_butt)?2:0;
-	buffer[5] += (state.r_shift)?4:0;
-	buffer[5] += (state.l_shift)?8:0;
-	buffer[6] = state.acceleration;
-	buffer[7] = state.breaking;
+void send_to_pc(WheelSystemState *state){
+	state->acceleration=0;
+	state->breaking=0; // TODO read actual values
+//	uint8_t buffer[10];
+//	buffer[0] = 0x69;
+//	buffer[4] = 0;
+//	buffer[1] = 0x0;
+//	buffer[2] = state.rotation & 0xFF;
+//	buffer[3] = (state.rotation >> 8);
+//	buffer[4] += (state.left_arr)?1:0;
+//	buffer[4] += (state.right_arr)?2:0;
+//	buffer[4] += (state.up_arr)?4:0;
+//	buffer[4] += (state.down_arr)?8:0;
+//	buffer[4] += (state.a_butt)?16:0;
+//	buffer[4] += (state.b_butt)?32:0;
+//	buffer[4] += (state.x_butt)?64:0;
+//	buffer[4] += (state.y_butt)?128:0;
+//	buffer[5] = 0;
+//	buffer[5] += (state.dl_butt)?1:0;
+//	buffer[5] += (state.dr_butt)?2:0;
+//	buffer[5] += (state.r_shift)?4:0;
+//	buffer[5] += (state.l_shift)?8:0;
+//	buffer[6] = state.acceleration;
+//	buffer[7] = state.breaking;
 
-	calc_crc16_checksum(buffer);
+//	uint16_t buton_group = 0;
+//	buton_group += (state.left_arr)?1:0;
+//	buton_group += (state.right_arr)?2:0;
+//	buton_group += (state.up_arr)?4:0;
+//	buton_group += (state.down_arr)?8:0;
+//
+//	buton_group += (state.a_butt)?16:0;
+//	buton_group += (state.b_butt)?32:0;
+//	buton_group += (state.x_butt)?64:0;
+//	buton_group += (state.y_butt)?128:0;
+//
+//	buton_group += (state.dl_butt)?256:0;
+//	buton_group += (state.dr_butt)?512:0;
+//
+//	buton_group += (state.r_shift)?1024:0;
+//	buton_group += (state.l_shift)?2048:0;
 
-	HAL_UART_Transmit(&huart1, buffer, 10, 30);
+
+//	uint16_t checksum = calc_crc16_checksum(state);
+
+//	uint8_t stringToSend[50];
+//	snprintf(stringToSend, sizeof(stringToSend), "105 %d %d %d %d %d\n", state.rotation, buton_group, state.acceleration, state.breaking, checksum);
+
+	HAL_UART_Transmit(&huart1, (uint8_t *)state, sizeof(WheelSystemState), HAL_MAX_DELAY);
 
  }
 /* USER CODE END 0 */
@@ -211,6 +252,7 @@ int main(void)
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
+  WheelSystemState wheel_state;
   while (1)
   {
     /* USER CODE END WHILE */
@@ -219,7 +261,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
     HAL_ADC_Start(&hadc1);
 
-    struct WheelSystemState wheel_state;
+
 
     /*Arrows*/
     left = HAL_GPIO_ReadPin(Arrow_left_GPIO_Port, Arrow_left_Pin);
@@ -265,10 +307,30 @@ int main(void)
 	wheel_state.breaking = 0;
 
 	printf("ІВАНЕ, ЛОВИ");
-	send_to_pc(wheel_state);
+	send_to_pc(&wheel_state);
 
     HAL_ADC_Stop(&hadc1);
-    HAL_Delay(50);
+    HAL_Delay(30);
+
+    // reset every field in struct
+    wheel_state.rotation = 0;
+
+    wheel_state.a_butt = false;
+    wheel_state.b_butt = false;
+    wheel_state.x_butt = false;
+    wheel_state.y_butt = false;
+
+    wheel_state.up_arr = false;
+    wheel_state.down_arr = false;
+    wheel_state.right_arr = false;
+    wheel_state.left_arr = false;
+
+    wheel_state.dl_butt = false;
+    wheel_state.dr_butt = false;
+
+    wheel_state.r_shift = false;
+    wheel_state.l_shift = false;
+
   }
   /* USER CODE END 3 */
 }
