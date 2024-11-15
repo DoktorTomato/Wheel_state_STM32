@@ -76,27 +76,30 @@ void MX_USB_HOST_Process(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-typedef struct __attribute__((packed)){
-	int rotation;
-	bool left_arr;
-	bool right_arr;
-	bool up_arr;
-	bool down_arr;
+#pragma pack(1)
+typedef struct{
+	uint16_t rotation;
 
-	bool a_butt;
-	bool b_butt;
-	bool x_butt;
-	bool y_butt;
+	uint8_t left_arr;
+	uint8_t right_arr;
+	uint8_t up_arr;
+	uint8_t down_arr;
 
-	bool dl_butt;
-	bool dr_butt;
+	uint8_t a_butt;
+	uint8_t b_butt;
+	uint8_t x_butt;
+	uint8_t y_butt;
 
-	bool r_shift;
-	bool l_shift;
+	uint8_t dl_butt;
+	uint8_t dr_butt;
 
-	int acceleration;
-	int breaking;
+	uint8_t r_shift;
+	uint8_t l_shift;
+
+	uint8_t acceleration;
+	uint8_t breaking;
 } WheelSystemState;
+#pragma pack()
 uint16_t get_i(WheelSystemState buffer, int i){
 	switch(i){
 	case 0: return buffer.rotation;
@@ -182,8 +185,10 @@ void send_to_pc(WheelSystemState *state){
 //	uint8_t stringToSend[50];
 //	snprintf(stringToSend, sizeof(stringToSend), "105 %d %d %d %d %d\n", state.rotation, buton_group, state.acceleration, state.breaking, checksum);
 
-	HAL_UART_Transmit(&huart1, (uint8_t *)state, sizeof(WheelSystemState), HAL_MAX_DELAY);
-
+//	HAL_UART_Transmit(&huart1, (uint8_t *)state, sizeof(WheelSystemState), HAL_MAX_DELAY);
+	uint8_t buffer[sizeof(WheelSystemState)];
+	memcpy(buffer, state, sizeof(WheelSystemState));
+	HAL_UART_Transmit(&huart1, buffer, sizeof(WheelSystemState), HAL_MAX_DELAY);
  }
 /* USER CODE END 0 */
 
@@ -287,21 +292,21 @@ int main(void)
 
 	wheel_state.rotation = analog_val;
 
-	wheel_state.a_butt = (a_butt==0)?true:false;
-	wheel_state.b_butt = (b_butt==0)?true:false;
-	wheel_state.x_butt = (x_butt==0)?true:false;
-	wheel_state.y_butt = (y_butt==0)?true:false;
+	wheel_state.a_butt = (a_butt==0)?1:0;
+	wheel_state.b_butt = (b_butt==0)?1:0;
+	wheel_state.x_butt = (x_butt==0)?1:0;
+	wheel_state.y_butt = (y_butt==0)?1:0;
 
-	wheel_state.up_arr = (up==0)?true:false;
-	wheel_state.down_arr = (down==0)?true:false;
-	wheel_state.right_arr = (right==0)?true:false;
-	wheel_state.left_arr = (left==0)?true:false;
+	wheel_state.up_arr = (up==0)?1:0;
+	wheel_state.down_arr = (down==0)?1:0;
+	wheel_state.right_arr = (right==0)?1:0;
+	wheel_state.left_arr = (left==0)?1:0;
 
-	wheel_state.dl_butt = (dl_butt==0)?true:false;
-	wheel_state.dr_butt = (dr_butt==0)?true:false;
+	wheel_state.dl_butt = (dl_butt==0)?1:0;
+	wheel_state.dr_butt = (dr_butt==0)?1:0;
 
-	wheel_state.r_shift = (r_shift==1)?true:false;
-	wheel_state.l_shift = (l_shift==1)?true:false;
+	wheel_state.r_shift = (r_shift==1)?1:0;
+	wheel_state.l_shift = (l_shift==1)?1:0;
 
 	wheel_state.acceleration = 0;
 	wheel_state.breaking = 0;
