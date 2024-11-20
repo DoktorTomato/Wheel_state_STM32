@@ -19,11 +19,10 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "usb_host.h"
-#include <stdbool.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -52,7 +51,7 @@ I2S_HandleTypeDef hi2s3;
 
 SPI_HandleTypeDef hspi1;
 
-UART_HandleTypeDef huart1;
+UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
 /* USER CODE END PV */
@@ -67,7 +66,7 @@ static void MX_I2S2_Init(void);
 static void MX_I2S3_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_ADC1_Init(void);
-static void MX_USART1_UART_Init(void);
+static void MX_USART2_UART_Init(void);
 void MX_USB_HOST_Process(void);
 
 /* USER CODE BEGIN PFP */
@@ -140,55 +139,25 @@ uint16_t calc_crc16_checksum(WheelSystemState buffer){
 void send_to_pc(WheelSystemState *state){
 	state->acceleration=0;
 	state->breaking=0; // TODO read actual values
-//	uint8_t buffer[10];
-//	buffer[0] = 0x69;
-//	buffer[4] = 0;
-//	buffer[1] = 0x0;
-//	buffer[2] = state.rotation & 0xFF;
-//	buffer[3] = (state.rotation >> 8);
-//	buffer[4] += (state.left_arr)?1:0;
-//	buffer[4] += (state.right_arr)?2:0;
-//	buffer[4] += (state.up_arr)?4:0;
-//	buffer[4] += (state.down_arr)?8:0;
-//	buffer[4] += (state.a_butt)?16:0;
-//	buffer[4] += (state.b_butt)?32:0;
-//	buffer[4] += (state.x_butt)?64:0;
-//	buffer[4] += (state.y_butt)?128:0;
-//	buffer[5] = 0;
-//	buffer[5] += (state.dl_butt)?1:0;
-//	buffer[5] += (state.dr_butt)?2:0;
-//	buffer[5] += (state.r_shift)?4:0;
-//	buffer[5] += (state.l_shift)?8:0;
-//	buffer[6] = state.acceleration;
-//	buffer[7] = state.breaking;
-
-//	uint16_t buton_group = 0;
-//	buton_group += (state.left_arr)?1:0;
-//	buton_group += (state.right_arr)?2:0;
-//	buton_group += (state.up_arr)?4:0;
-//	buton_group += (state.down_arr)?8:0;
-//
-//	buton_group += (state.a_butt)?16:0;
-//	buton_group += (state.b_butt)?32:0;
-//	buton_group += (state.x_butt)?64:0;
-//	buton_group += (state.y_butt)?128:0;
-//
-//	buton_group += (state.dl_butt)?256:0;
-//	buton_group += (state.dr_butt)?512:0;
-//
-//	buton_group += (state.r_shift)?1024:0;
-//	buton_group += (state.l_shift)?2048:0;
-
-
-//	uint16_t checksum = calc_crc16_checksum(state);
-
-//	uint8_t stringToSend[50];
-//	snprintf(stringToSend, sizeof(stringToSend), "105 %d %d %d %d %d\n", state.rotation, buton_group, state.acceleration, state.breaking, checksum);
-
-//	HAL_UART_Transmit(&huart1, (uint8_t *)state, sizeof(WheelSystemState), HAL_MAX_DELAY);
-	uint8_t buffer[sizeof(WheelSystemState)];
-	memcpy(buffer, state, sizeof(WheelSystemState));
-	HAL_UART_Transmit(&huart1, buffer, sizeof(WheelSystemState), HAL_MAX_DELAY);
+	uint8_t buffer[sizeof(WheelSystemState)+1];
+	buffer[0] = (uint8_t)'S';
+	memcpy(&buffer[1], &state->rotation, 2);
+	memcpy(&buffer[3], &state->left_arr, 1);
+	memcpy(&buffer[4], &state->right_arr, 1);
+	memcpy(&buffer[5], &state->up_arr, 1);
+	memcpy(&buffer[6], &state->down_arr, 1);
+	memcpy(&buffer[7], &state->a_butt, 1);
+	memcpy(&buffer[8], &state->b_butt, 1);
+	memcpy(&buffer[9], &state->x_butt, 1);
+	memcpy(&buffer[10], &state->y_butt, 1);
+	memcpy(&buffer[11], &state->dl_butt, 1);
+	memcpy(&buffer[12], &state->dr_butt, 1);
+	memcpy(&buffer[13], &state->r_shift, 1);
+	memcpy(&buffer[14], &state->l_shift, 1);
+	memcpy(&buffer[15], &state->acceleration, 1);
+	memcpy(&buffer[16], &state->breaking, 1);
+	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), HAL_MAX_DELAY);
+//	HAL_Delay(100);
  }
 /* USER CODE END 0 */
 
@@ -231,7 +200,7 @@ int main(void)
   MX_SPI1_Init();
   MX_USB_HOST_Init();
   MX_ADC1_Init();
-  MX_USART1_UART_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   int analog_val = 0;
 
@@ -258,15 +227,22 @@ int main(void)
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   WheelSystemState wheel_state;
+  uint8_t read_buf[1];
   while (1)
   {
     /* USER CODE END WHILE */
     MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
-    HAL_ADC_Start(&hadc1);
+//    HAL_ADC_Start(&hadc1);
 
 
+    memset(read_buf, 0, sizeof(read_buf));
+    HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
+//    if ((uint8_t)read_buf[0] != 105){
+//    	continue;
+//    }
+    memset(read_buf, 0, sizeof(read_buf));
 
     /*Arrows*/
     left = HAL_GPIO_ReadPin(Arrow_left_GPIO_Port, Arrow_left_Pin);
@@ -288,7 +264,7 @@ int main(void)
     dl_butt = HAL_GPIO_ReadPin(DL_button_GPIO_Port, DL_button_Pin);
     dr_butt = HAL_GPIO_ReadPin(DR_button_GPIO_Port, DR_button_Pin);
 
-	analog_val = HAL_ADC_GetValue(&hadc1); /* interval between 1 and 4095 */
+//	analog_val = HAL_ADC_GetValue(&hadc1); /* interval between 1 and 4095 */
 
 	wheel_state.rotation = analog_val;
 
@@ -311,30 +287,12 @@ int main(void)
 	wheel_state.acceleration = 0;
 	wheel_state.breaking = 0;
 
-	printf("ІВАНЕ, ЛОВИ");
+//	uint8_t data[] = "Hello world\n";
+//	HAL_UART_Transmit(&huart2, data, 12, 1000);
 	send_to_pc(&wheel_state);
 
-    HAL_ADC_Stop(&hadc1);
-    HAL_Delay(30);
-
-    // reset every field in struct
-    wheel_state.rotation = 0;
-
-    wheel_state.a_butt = false;
-    wheel_state.b_butt = false;
-    wheel_state.x_butt = false;
-    wheel_state.y_butt = false;
-
-    wheel_state.up_arr = false;
-    wheel_state.down_arr = false;
-    wheel_state.right_arr = false;
-    wheel_state.left_arr = false;
-
-    wheel_state.dl_butt = false;
-    wheel_state.dr_butt = false;
-
-    wheel_state.r_shift = false;
-    wheel_state.l_shift = false;
+//    HAL_ADC_Stop(&hadc1);
+    HAL_Delay(100);
 
   }
   /* USER CODE END 3 */
@@ -598,35 +556,35 @@ static void MX_SPI1_Init(void)
 }
 
 /**
-  * @brief USART1 Initialization Function
+  * @brief USART2 Initialization Function
   * @param None
   * @retval None
   */
-static void MX_USART1_UART_Init(void)
+static void MX_USART2_UART_Init(void)
 {
 
-  /* USER CODE BEGIN USART1_Init 0 */
+  /* USER CODE BEGIN USART2_Init 0 */
 
-  /* USER CODE END USART1_Init 0 */
+  /* USER CODE END USART2_Init 0 */
 
-  /* USER CODE BEGIN USART1_Init 1 */
+  /* USER CODE BEGIN USART2_Init 1 */
 
-  /* USER CODE END USART1_Init 1 */
-  huart1.Instance = USART1;
-  huart1.Init.BaudRate = 9600;
-  huart1.Init.WordLength = UART_WORDLENGTH_8B;
-  huart1.Init.StopBits = UART_STOPBITS_1;
-  huart1.Init.Parity = UART_PARITY_ODD;
-  huart1.Init.Mode = UART_MODE_TX_RX;
-  huart1.Init.HwFlowCtl = UART_HWCONTROL_NONE;
-  huart1.Init.OverSampling = UART_OVERSAMPLING_16;
-  if (HAL_UART_Init(&huart1) != HAL_OK)
+  /* USER CODE END USART2_Init 1 */
+  huart2.Instance = USART2;
+  huart2.Init.BaudRate = 115200;
+  huart2.Init.WordLength = UART_WORDLENGTH_8B;
+  huart2.Init.StopBits = UART_STOPBITS_1;
+  huart2.Init.Parity = UART_PARITY_NONE;
+  huart2.Init.Mode = UART_MODE_TX_RX;
+  huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
+  huart2.Init.OverSampling = UART_OVERSAMPLING_16;
+  if (HAL_UART_Init(&huart2) != HAL_OK)
   {
     Error_Handler();
   }
-  /* USER CODE BEGIN USART1_Init 2 */
+  /* USER CODE BEGIN USART2_Init 2 */
 
-  /* USER CODE END USART1_Init 2 */
+  /* USER CODE END USART2_Init 2 */
 
 }
 
