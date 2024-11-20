@@ -629,20 +629,6 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : Arrow_left_Pin Arrow_right_Pin */
-  GPIO_InitStruct.Pin = Arrow_left_Pin|Arrow_right_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : Arrow_up_Pin Arrow_down_Pin A_button_Pin B_button_Pin
-                           X_button_Pin Y_button_Pin */
-  GPIO_InitStruct.Pin = Arrow_up_Pin|Arrow_down_Pin|A_button_Pin|B_button_Pin
-                          |X_button_Pin|Y_button_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
   /*Configure GPIO pins : LD4_Pin LD3_Pin LD5_Pin LD6_Pin
                            Audio_RST_Pin */
   GPIO_InitStruct.Pin = LD4_Pin|LD3_Pin|LD5_Pin|LD6_Pin
@@ -658,17 +644,25 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
+  /*Configure GPIO pins : Arrow_left_Pin Arrow_right_Pin Arrow_up_Pin Arrow_downW_Pin
+                           DR_button_Pin DL_button_Pin */
+  GPIO_InitStruct.Pin = Arrow_left_Pin|Arrow_right_Pin|Arrow_up_Pin|Arrow_downW_Pin
+                          |DR_button_Pin|DL_button_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+
   /*Configure GPIO pin : OTG_FS_OverCurrent_Pin */
   GPIO_InitStruct.Pin = OTG_FS_OverCurrent_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(OTG_FS_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DR_button_Pin DL_button_Pin */
-  GPIO_InitStruct.Pin = DR_button_Pin|DL_button_Pin;
+  /*Configure GPIO pins : A_button_Pin B_button_Pin X_button_Pin Y_button_Pin */
+  GPIO_InitStruct.Pin = A_button_Pin|B_button_Pin|X_button_Pin|Y_button_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOD, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
 /* USER CODE END MX_GPIO_Init_2 */
