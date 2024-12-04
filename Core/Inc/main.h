@@ -143,6 +143,10 @@ void Error_Handler(void);
 #define X_button_GPIO_Port GPIOB
 #define Y_button_Pin GPIO_PIN_7
 #define Y_button_GPIO_Port GPIOB
+#define right_stopper_Pin GPIO_PIN_8
+#define right_stopper_GPIO_Port GPIOB
+#define left_stopper_Pin GPIO_PIN_9
+#define left_stopper_GPIO_Port GPIOB
 #define MEMS_INT2_Pin GPIO_PIN_1
 #define MEMS_INT2_GPIO_Port GPIOE
 
