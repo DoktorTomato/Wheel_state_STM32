@@ -200,7 +200,11 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 //  hUsbDeviceFS;
-  uint16_t analog_val = 0;
+  uint16_t wheel[3];
+  uint16_t rotation = 0;
+  uint16_t breaks = 0;
+  uint16_t acceleration = 0;
+
   uint8_t left = 0;
   uint8_t right = 0;
   uint8_t up = 0;
@@ -217,7 +221,8 @@ int main(void)
   uint8_t r_shift = 0;
   uint8_t l_shift = 0;
 
-
+  ADC_ChannelConfTypeDef ADC_CH_Cfg = {0};
+  uint32_t ADC_Channels[3] = {ADC_CHANNEL_1, ADC_CHANNEL_14, ADC_CHANNEL_15};
 
   /* USER CODE END 2 */
 
@@ -230,14 +235,15 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-    HAL_ADC_Start(&hadc1);
 
 
     memset(read_buf, 0, sizeof(read_buf));
     HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
+    HAL_ADC_Start_DMA(&hadc1, wheel, 3);
     if ((uint8_t)read_buf[0] != 105){
     	continue;
     }
+
     memset(read_buf, 0, sizeof(read_buf));
 
     /*Arrows*/
@@ -260,9 +266,11 @@ int main(void)
     dl_butt = HAL_GPIO_ReadPin(DL_button_GPIO_Port, DL_button_Pin);
     dr_butt = HAL_GPIO_ReadPin(DR_button_GPIO_Port, DR_button_Pin);
 
-	analog_val = HAL_ADC_GetValue(&hadc1); /* interval between 1 and 4095 */
+	rotation = wheel[0];
+	breaks = wheel[1];
+	acceleration = wheel[2];
 
-	wheel_state.rotation = analog_val;
+	wheel_state.rotation = rotation;
 
 	wheel_state.a_butt = (a_butt==0)?1:0;
 	wheel_state.b_butt = (b_butt==0)?1:0;
@@ -280,8 +288,8 @@ int main(void)
 	wheel_state.r_shift = (r_shift==1)?1:0;
 	wheel_state.l_shift = (l_shift==1)?1:0;
 
-	wheel_state.acceleration = 0;
-	wheel_state.breaking = 0;
+	wheel_state.acceleration = acceleration;
+	wheel_state.breaking = breaks;
 
 //	uint8_t data[] = "Hello world\n";
 //	HAL_UART_Transmit(&huart2, data, 12, 1000);
@@ -400,13 +408,13 @@ static void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ScanConvMode = ENABLE;
   hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
+  hadc1.Init.NbrOfConversion = 3;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -419,6 +427,25 @@ static void MX_ADC1_Init(void)
   sConfig.Channel = ADC_CHANNEL_1;
   sConfig.Rank = 1;
   sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_14;
+  sConfig.Rank = 2;
+  sConfig.SamplingTime = ADC_SAMPLETIME_480CYCLES;
+  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+
+  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
+  */
+  sConfig.Channel = ADC_CHANNEL_15;
+  sConfig.Rank = 3;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();

@@ -81,6 +81,10 @@ void Error_Handler(void);
 #define SPI1_MISO_GPIO_Port GPIOA
 #define SPI1_MOSI_Pin GPIO_PIN_7
 #define SPI1_MOSI_GPIO_Port GPIOA
+#define Breaks_Pin GPIO_PIN_4
+#define Breaks_GPIO_Port GPIOC
+#define Acceleration_Pin GPIO_PIN_5
+#define Acceleration_GPIO_Port GPIOC
 #define CLK_IN_Pin GPIO_PIN_10
 #define CLK_IN_GPIO_Port GPIOB
 #define LD4_Pin GPIO_PIN_12
