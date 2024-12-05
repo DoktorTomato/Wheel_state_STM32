@@ -119,8 +119,8 @@ void Error_Handler(void);
 #define Arrow_right_GPIO_Port GPIOD
 #define Arrow_up_Pin GPIO_PIN_2
 #define Arrow_up_GPIO_Port GPIOD
-#define Arrow_downW_Pin GPIO_PIN_3
-#define Arrow_downW_GPIO_Port GPIOD
+#define Arrow_down_Pin GPIO_PIN_3
+#define Arrow_down_GPIO_Port GPIOD
 #define Audio_RST_Pin GPIO_PIN_4
 #define Audio_RST_GPIO_Port GPIOD
 #define OTG_FS_OverCurrent_Pin GPIO_PIN_5

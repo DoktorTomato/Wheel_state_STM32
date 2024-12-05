@@ -18,7 +18,6 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "usb_host.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -64,8 +63,6 @@ static void MX_I2S3_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART2_UART_Init(void);
-void MX_USB_HOST_Process(void);
-
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -76,21 +73,21 @@ void MX_USB_HOST_Process(void);
 typedef struct{
 	uint16_t rotation;
 
-	uint8_t left_arr;
-	uint8_t right_arr;
-	uint8_t up_arr;
-	uint8_t down_arr;
+	uint8_t left_arr:1;
+	uint8_t right_arr:1;
+	uint8_t up_arr:1;
+	uint8_t down_arr:1;
 
-	uint8_t a_butt;
-	uint8_t b_butt;
-	uint8_t x_butt;
-	uint8_t y_butt;
+	uint8_t a_butt:1;
+	uint8_t b_butt:1;
+	uint8_t x_butt:1;
+	uint8_t y_butt:1;
 
-	uint8_t dl_butt;
-	uint8_t dr_butt;
+	uint8_t dl_butt:1;
+	uint8_t dr_butt:1;
 
-	uint8_t r_shift;
-	uint8_t l_shift;
+	uint8_t r_shift:1;
+	uint8_t l_shift:1;
 
 	uint8_t acceleration;
 	uint8_t breaking;
@@ -136,24 +133,29 @@ uint16_t calc_crc16_checksum(WheelSystemState buffer){
 void send_to_pc(WheelSystemState *state){
 	state->acceleration=0;
 	state->breaking=0; // TODO read actual values
-	uint8_t buffer[sizeof(WheelSystemState)+1];
+	uint8_t buffer[7];
 	buffer[0] = (uint8_t)'S';
 	memcpy(&buffer[1], &state->rotation, 2);
-	memcpy(&buffer[3], &state->left_arr, 1);
-	memcpy(&buffer[4], &state->right_arr, 1);
-	memcpy(&buffer[5], &state->up_arr, 1);
-	memcpy(&buffer[6], &state->down_arr, 1);
-	memcpy(&buffer[7], &state->a_butt, 1);
-	memcpy(&buffer[8], &state->b_butt, 1);
-	memcpy(&buffer[9], &state->x_butt, 1);
-	memcpy(&buffer[10], &state->y_butt, 1);
-	memcpy(&buffer[11], &state->dl_butt, 1);
-	memcpy(&buffer[12], &state->dr_butt, 1);
-	memcpy(&buffer[13], &state->r_shift, 1);
-	memcpy(&buffer[14], &state->l_shift, 1);
-	memcpy(&buffer[15], &state->acceleration, 1);
-	memcpy(&buffer[16], &state->breaking, 1);
+
+	buffer[3] = (state->left_arr)?1:0;
+	buffer[3] += (state->right_arr)?2:0;
+	buffer[3] += (state->down_arr)?4:0;
+	buffer[3] += (state->up_arr)?8:0;
+
+	buffer[3] += (state->a_butt)?16:0;
+	buffer[3] += (state->b_butt)?32:0;
+	buffer[3] += (state->x_butt)?64:0;
+	buffer[3] += (state->y_butt)?128:0;
+
+	buffer[4] = (state->dl_butt)?1:0;
+	buffer[4] += (state->dr_butt)?2:0;
+	buffer[4] += (state->r_shift)?4:0;
+	buffer[4] += (state->l_shift)?8:0;
+
+	memcpy(&buffer[5], &state->acceleration, 1);
+	memcpy(&buffer[6], &state->breaking, 1);
 	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), HAL_MAX_DELAY);
+//	CDC_Transmit_FS(buffer, sizeof(buffer));
 //	HAL_Delay(100);
  }
 /* USER CODE END 0 */
@@ -194,12 +196,11 @@ int main(void)
   MX_I2S2_Init();
   MX_I2S3_Init();
   MX_SPI1_Init();
-  MX_USB_HOST_Init();
   MX_ADC1_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
-  int analog_val = 0;
-
+//  hUsbDeviceFS;
+  uint16_t analog_val = 0;
   uint8_t left = 0;
   uint8_t right = 0;
   uint8_t up = 0;
@@ -227,17 +228,16 @@ int main(void)
   while (1)
   {
     /* USER CODE END WHILE */
-    MX_USB_HOST_Process();
 
     /* USER CODE BEGIN 3 */
-//    HAL_ADC_Start(&hadc1);
+    HAL_ADC_Start(&hadc1);
 
 
     memset(read_buf, 0, sizeof(read_buf));
     HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
-//    if ((uint8_t)read_buf[0] != 105){
-//    	continue;
-//    }
+    if ((uint8_t)read_buf[0] != 105){
+    	continue;
+    }
     memset(read_buf, 0, sizeof(read_buf));
 
     /*Arrows*/
@@ -260,7 +260,7 @@ int main(void)
     dl_butt = HAL_GPIO_ReadPin(DL_button_GPIO_Port, DL_button_Pin);
     dr_butt = HAL_GPIO_ReadPin(DR_button_GPIO_Port, DR_button_Pin);
 
-//	analog_val = HAL_ADC_GetValue(&hadc1); /* interval between 1 and 4095 */
+	analog_val = HAL_ADC_GetValue(&hadc1); /* interval between 1 and 4095 */
 
 	wheel_state.rotation = analog_val;
 
@@ -285,10 +285,28 @@ int main(void)
 
 //	uint8_t data[] = "Hello world\n";
 //	HAL_UART_Transmit(&huart2, data, 12, 1000);
+//	CDC_Transmit_FS(data, sizeof(data));
 	send_to_pc(&wheel_state);
+//	left = 0;
+//	right = 0;
+//	up = 0;
+//	down = 0;
+//
+//	r_shift = 0;
+//	l_shift = 0;
+//
+//	a_butt = 0;
+//	b_butt = 0;
+//	x_butt = 0;
+//	y_butt = 0;
+//
+//	dl_butt = 0;ilil
+//	dr_butt = 0;
+//
+//	analog_val = 0;
 
-//    HAL_ADC_Stop(&hadc1);
-    HAL_Delay(100);
+    HAL_ADC_Stop(&hadc1);
+//    HAL_Delay(100);
 
   }
   /* USER CODE END 3 */
@@ -315,8 +333,8 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.HSEState = RCC_HSE_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
-  RCC_OscInitStruct.PLL.PLLM = 25;
-  RCC_OscInitStruct.PLL.PLLN = 192;
+  RCC_OscInitStruct.PLL.PLLM = 4;
+  RCC_OscInitStruct.PLL.PLLN = 96;
   RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV6;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
@@ -330,7 +348,7 @@ void SystemClock_Config(void)
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
   if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
@@ -351,7 +369,7 @@ void PeriphCommonClock_Config(void)
   */
   PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_I2S;
   PeriphClkInitStruct.PLLI2S.PLLI2SN = 192;
-  PeriphClkInitStruct.PLLI2S.PLLI2SM = 16;
+  PeriphClkInitStruct.PLLI2S.PLLI2SM = 4;
   PeriphClkInitStruct.PLLI2S.PLLI2SR = 2;
   if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
   {
@@ -644,9 +662,23 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_PULLDOWN;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : Arrow_left_Pin Arrow_right_Pin Arrow_up_Pin Arrow_downW_Pin
+  /*Configure GPIO pin : VBUS_FS_Pin */
+  GPIO_InitStruct.Pin = VBUS_FS_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  HAL_GPIO_Init(VBUS_FS_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : OTG_FS_ID_Pin OTG_FS_DM_Pin OTG_FS_DP_Pin */
+  GPIO_InitStruct.Pin = OTG_FS_ID_Pin|OTG_FS_DM_Pin|OTG_FS_DP_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_VERY_HIGH;
+  GPIO_InitStruct.Alternate = GPIO_AF10_OTG_FS;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : Arrow_left_Pin Arrow_right_Pin Arrow_up_Pin Arrow_down_Pin
                            DR_button_Pin DL_button_Pin */
-  GPIO_InitStruct.Pin = Arrow_left_Pin|Arrow_right_Pin|Arrow_up_Pin|Arrow_downW_Pin
+  GPIO_InitStruct.Pin = Arrow_left_Pin|Arrow_right_Pin|Arrow_up_Pin|Arrow_down_Pin
                           |DR_button_Pin|DL_button_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
