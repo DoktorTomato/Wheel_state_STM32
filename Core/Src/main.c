@@ -89,8 +89,8 @@ typedef struct{
 	uint8_t r_shift:1;
 	uint8_t l_shift:1;
 
-	uint8_t acceleration;
-	uint8_t breaking;
+	uint16_t acceleration;
+	uint16_t breaking;
 } WheelSystemState;
 #pragma pack()
 uint16_t get_i(WheelSystemState buffer, int i){
@@ -131,9 +131,7 @@ uint16_t calc_crc16_checksum(WheelSystemState buffer){
 }
 
 void send_to_pc(WheelSystemState *state){
-	state->acceleration=0;
-	state->breaking=0; // TODO read actual values
-	uint8_t buffer[7];
+	uint8_t buffer[9];
 	buffer[0] = (uint8_t)'S';
 	memcpy(&buffer[1], &state->rotation, 2);
 
@@ -152,12 +150,24 @@ void send_to_pc(WheelSystemState *state){
 	buffer[4] += (state->r_shift)?4:0;
 	buffer[4] += (state->l_shift)?8:0;
 
-	memcpy(&buffer[5], &state->acceleration, 1);
-	memcpy(&buffer[6], &state->breaking, 1);
+	memcpy(&buffer[5], &state->acceleration, 2);
+	memcpy(&buffer[7], &state->breaking, 2);
 	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), HAL_MAX_DELAY);
 //	CDC_Transmit_FS(buffer, sizeof(buffer));
 //	HAL_Delay(100);
  }
+uint16_t wheel[3];
+void calibration(){
+	uint8_t buffer[7];
+	HAL_ADC_Start_DMA(&hadc1, wheel, 3);
+	memcpy(&buffer[0], wheel[0], 2);
+	memcpy(&buffer[2], wheel[1], 2);
+	memcpy(&buffer[4], wheel[2], 2);
+	buffer[6] = HAL_GPIO_ReadPin(left_stopper_GPIO_Port, left_stopper_Pin) ? 0 : 1;
+	buffer[6] += HAL_GPIO_ReadPin(right_stopper_GPIO_Port, right_stopper_Pin) ? 0 : 2;
+	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), HAL_MAX_DELAY);
+
+}
 /* USER CODE END 0 */
 
 /**
@@ -200,7 +210,7 @@ int main(void)
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 //  hUsbDeviceFS;
-  uint16_t wheel[3];
+//  uint16_t wheel[3];
   uint16_t rotation = 0;
   uint16_t breaks = 0;
   uint16_t acceleration = 0;
@@ -239,7 +249,10 @@ int main(void)
 
     memset(read_buf, 0, sizeof(read_buf));
     HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
-    HAL_ADC_Start_DMA(&hadc1, wheel, 3);
+    if ((uint8_t)read_buf[0] == 0x42){
+    	calibration();
+    	continue;
+    }
     if ((uint8_t)read_buf[0] != 105){
     	continue;
     }
@@ -266,6 +279,7 @@ int main(void)
     dl_butt = HAL_GPIO_ReadPin(DL_button_GPIO_Port, DL_button_Pin);
     dr_butt = HAL_GPIO_ReadPin(DR_button_GPIO_Port, DR_button_Pin);
 
+    HAL_ADC_Start_DMA(&hadc1, wheel, 3);
 	rotation = wheel[0];
 	breaks = wheel[1];
 	acceleration = wheel[2];
