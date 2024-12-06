@@ -281,8 +281,8 @@ int main(void)
 
     HAL_ADC_Start_DMA(&hadc1, wheel, 3);
 	rotation = wheel[0];
-	breaks = wheel[1];
-	acceleration = wheel[2];
+	breaks = wheel[2];
+	acceleration = wheel[1];
 
 	wheel_state.rotation = rotation;
 
