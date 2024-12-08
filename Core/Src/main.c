@@ -291,10 +291,10 @@ int main(void)
 //		  dim();
 //		  flag = 0;
 //	  }
-	  HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
-	  HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
-	  TIM1->CCR1 = 60000; // higher is faster
-	  TIM1->CCR2 = 0; // higher is faster
+//	  HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
+//	  HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
+//	  TIM1->CCR1 = 60000; // higher is faster
+//	  TIM1->CCR2 = 0; // higher is faster
     memset(read_buf, 0, sizeof(read_buf));
     HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
     if ((uint8_t)read_buf[0] == 0x42){
