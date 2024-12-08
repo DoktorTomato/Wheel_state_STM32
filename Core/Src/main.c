@@ -48,9 +48,12 @@ I2S_HandleTypeDef hi2s3;
 
 SPI_HandleTypeDef hspi1;
 
+TIM_HandleTypeDef htim1;
+
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
+int MOTOR_LIMITER_DO_NOT_TOUCH = 0.2 * 65535;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -63,6 +66,7 @@ static void MX_I2S3_Init(void);
 static void MX_SPI1_Init(void);
 static void MX_ADC1_Init(void);
 static void MX_USART2_UART_Init(void);
+static void MX_TIM1_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -160,13 +164,43 @@ uint16_t wheel[3];
 void calibration(){
 	uint8_t buffer[7];
 	HAL_ADC_Start_DMA(&hadc1, wheel, 3);
-	memcpy(&buffer[0], wheel[0], 2);
-	memcpy(&buffer[2], wheel[1], 2);
-	memcpy(&buffer[4], wheel[2], 2);
+	memcpy(&buffer[0], &wheel[0], 2);
+	memcpy(&buffer[2], &wheel[1], 2);
+	memcpy(&buffer[4], &wheel[2], 2);
 	buffer[6] = HAL_GPIO_ReadPin(left_stopper_GPIO_Port, left_stopper_Pin) ? 0 : 1;
 	buffer[6] += HAL_GPIO_ReadPin(right_stopper_GPIO_Port, right_stopper_Pin) ? 0 : 2;
 	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), HAL_MAX_DELAY);
 
+}
+void dim(){
+
+	TIM1->CCR1 = 60000;
+	while(TIM1->CCR2 > 0){
+		TIM1->CCR2 -= 60;
+	}
+}
+void light_up(){
+	TIM1->CCR2 = 0;
+	while(TIM1->CCR2 < 60){
+		TIM1->CCR2 += 6;
+	}
+}
+void ffb_handler(){
+	int32_t buffer[1];
+	uint8_t to_read[4];
+	HAL_UART_Receive(&huart2, to_read, 4, HAL_MAX_DELAY);
+	memcpy(&buffer[0], &to_read[0], 4);
+	int8_t direction = (buffer[0] > 0) ? 1 : -1;
+	buffer[0] = abs(buffer[0]);
+	int32_t applied_force = (buffer[0] * MOTOR_LIMITER_DO_NOT_TOUCH) / (65535);
+	if(direction == 1){
+		TIM1->CCR2 = 0;
+		TIM1->CCR1 = applied_force;
+	}else{
+		TIM1->CCR1 = 0;
+		TIM1->CCR2 = applied_force;
+	}
+	return 0;
 }
 /* USER CODE END 0 */
 
@@ -208,6 +242,7 @@ int main(void)
   MX_SPI1_Init();
   MX_ADC1_Init();
   MX_USART2_UART_Init();
+  MX_TIM1_Init();
   /* USER CODE BEGIN 2 */
 //  hUsbDeviceFS;
 //  uint16_t wheel[3];
@@ -231,6 +266,8 @@ int main(void)
   uint8_t r_shift = 0;
   uint8_t l_shift = 0;
 
+  uint8_t flag = 0;
+
   ADC_ChannelConfTypeDef ADC_CH_Cfg = {0};
   uint32_t ADC_Channels[3] = {ADC_CHANNEL_1, ADC_CHANNEL_14, ADC_CHANNEL_15};
 
@@ -240,20 +277,35 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   WheelSystemState wheel_state;
   uint8_t read_buf[1];
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
+  HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
   while (1)
   {
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-
-
+//	  if (flag == 0){
+//		  light_up();
+//		  flag = 1;
+//	  }else{
+//		  dim();
+//		  flag = 0;
+//	  }
+	  HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
+	  HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
+	  TIM1->CCR1 = 60000; // higher is faster
+	  TIM1->CCR2 = 0; // higher is faster
     memset(read_buf, 0, sizeof(read_buf));
     HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
     if ((uint8_t)read_buf[0] == 0x42){
     	calibration();
     	continue;
     }
-    if ((uint8_t)read_buf[0] != 105){
+    if ((uint8_t)read_buf[0] == 0x34){
+    	ffb_handler();
+    	continue;
+    }
+    if ((uint8_t)read_buf[0] != 0x69){
     	continue;
     }
 
@@ -577,6 +629,85 @@ static void MX_SPI1_Init(void)
 }
 
 /**
+  * @brief TIM1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM1_Init(void)
+{
+
+  /* USER CODE BEGIN TIM1_Init 0 */
+
+  /* USER CODE END TIM1_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+  TIM_BreakDeadTimeConfigTypeDef sBreakDeadTimeConfig = {0};
+
+  /* USER CODE BEGIN TIM1_Init 1 */
+
+  /* USER CODE END TIM1_Init 1 */
+  htim1.Instance = TIM1;
+  htim1.Init.Prescaler = 72-1;
+  htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim1.Init.Period = 65535;
+  htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim1.Init.RepetitionCounter = 0;
+  htim1.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim1, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim1, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  sConfigOC.OCIdleState = TIM_OCIDLESTATE_RESET;
+  sConfigOC.OCNIdleState = TIM_OCNIDLESTATE_RESET;
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim1, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_DISABLE;
+  sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_DISABLE;
+  sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_OFF;
+  sBreakDeadTimeConfig.DeadTime = 0;
+  sBreakDeadTimeConfig.BreakState = TIM_BREAK_DISABLE;
+  sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+  sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_DISABLE;
+  if (HAL_TIMEx_ConfigBreakDeadTime(&htim1, &sBreakDeadTimeConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM1_Init 2 */
+
+  /* USER CODE END TIM1_Init 2 */
+  HAL_TIM_MspPostInit(&htim1);
+
+}
+
+/**
   * @brief USART2 Initialization Function
   * @param None
   * @retval None
@@ -645,7 +776,7 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOD_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(CS_I2C_SPI_GPIO_Port, CS_I2C_SPI_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOE, CS_I2C_SPI_Pin|left_en_Pin|right_en_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(OTG_FS_PowerSwitchOn_GPIO_Port, OTG_FS_PowerSwitchOn_Pin, GPIO_PIN_SET);
@@ -662,12 +793,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(DATA_Ready_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pin : CS_I2C_SPI_Pin */
-  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin;
+  /*Configure GPIO pins : CS_I2C_SPI_Pin left_en_Pin right_en_Pin */
+  GPIO_InitStruct.Pin = CS_I2C_SPI_Pin|left_en_Pin|right_en_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(CS_I2C_SPI_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(GPIOE, &GPIO_InitStruct);
 
   /*Configure GPIO pins : INT1_Pin INT2_Pin MEMS_INT2_Pin */
   GPIO_InitStruct.Pin = INT1_Pin|INT2_Pin|MEMS_INT2_Pin;
@@ -731,16 +862,12 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(OTG_FS_OverCurrent_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : A_button_Pin B_button_Pin X_button_Pin Y_button_Pin */
-  GPIO_InitStruct.Pin = A_button_Pin|B_button_Pin|X_button_Pin|Y_button_Pin;
+  /*Configure GPIO pins : A_button_Pin B_button_Pin X_button_Pin Y_button_Pin
+                           right_stopper_Pin left_stopper_Pin */
+  GPIO_InitStruct.Pin = A_button_Pin|B_button_Pin|X_button_Pin|Y_button_Pin
+                          |right_stopper_Pin|left_stopper_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : right_stopper_Pin left_stopper_Pin */
-  GPIO_InitStruct.Pin = right_stopper_Pin|left_stopper_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
 /* USER CODE BEGIN MX_GPIO_Init_2 */
