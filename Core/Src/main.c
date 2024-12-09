@@ -190,25 +190,19 @@ enum effect_type{
 	RAMP = 0x02,
 	FRICTION = 0x03
 };
-void ffb_handler(){
+void ffb_handler(WheelSystemState state){
 	HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
 	HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
-	uint8_t effect_type[1];
-	HAL_UART_Receive(&huart2, effect_type, 1, HAL_MAX_DELAY);
-	if (effect_type[0] == CONSTANT_FORCE){
-		int16_t value;
-		uint8_t read_buf[2];
-		HAL_UART_Receive(&huart2, read_buf, 2, HAL_MAX_DELAY);
-		value = read_buf[0] << 8 | read_buf[1];
-		if (value > 0){
-			value = abs(value);
-			TIM1->CCR1 = 0;
-			TIM1->CCR2 = value;
-		}else{
-			value = abs(value);
-			TIM1->CCR2 = 0;
-			TIM1->CCR1 = value;
-		}
+	int16_t value = (((state.rotation - 2048) * MOTOR_LIMITER_DO_NOT_TOUCH / 2048));
+	uint8_t read_buf[2];
+	if (value > 0){
+		value = abs(value);
+		TIM1->CCR1 = 0;
+		TIM1->CCR2 = value;
+	}else{
+		value = abs(value);
+		TIM1->CCR2 = 0;
+		TIM1->CCR1 = value;
 	}
 }
 /* USER CODE END 0 */
@@ -310,10 +304,6 @@ int main(void)
     	calibration();
     	continue;
     }
-    if ((uint8_t)read_buf[0] == 0x34){
-    	ffb_handler();
-    	continue;
-    }
     if ((uint8_t)read_buf[0] != 0x69){
     	continue;
     }
@@ -370,6 +360,7 @@ int main(void)
 //	HAL_UART_Transmit(&huart2, data, 12, 1000);
 //	CDC_Transmit_FS(data, sizeof(data));
 	send_to_pc(&wheel_state);
+	ffb_handler(wheel_state);
 //	left = 0;
 //	right = 0;
 //	up = 0;
