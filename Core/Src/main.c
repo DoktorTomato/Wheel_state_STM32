@@ -185,22 +185,31 @@ void light_up(){
 		TIM1->CCR2 += 6;
 	}
 }
+enum effect_type{
+	CONSTANT_FORCE = 0x01,
+	RAMP = 0x02,
+	FRICTION = 0x03
+};
 void ffb_handler(){
-	int32_t buffer[1];
-	uint8_t to_read[4];
-	HAL_UART_Receive(&huart2, to_read, 4, HAL_MAX_DELAY);
-	memcpy(&buffer[0], &to_read[0], 4);
-	int8_t direction = (buffer[0] > 0) ? 1 : -1;
-	buffer[0] = abs(buffer[0]);
-	int32_t applied_force = (buffer[0] * MOTOR_LIMITER_DO_NOT_TOUCH) / (65535);
-	if(direction == 1){
-		TIM1->CCR2 = 0;
-		TIM1->CCR1 = applied_force;
-	}else{
-		TIM1->CCR1 = 0;
-		TIM1->CCR2 = applied_force;
+	HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
+	HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
+	uint8_t effect_type[1];
+	HAL_UART_Receive(&huart2, effect_type, 1, HAL_MAX_DELAY);
+	if (effect_type[0] == CONSTANT_FORCE){
+		int16_t value;
+		uint8_t read_buf[2];
+		HAL_UART_Receive(&huart2, read_buf, 2, HAL_MAX_DELAY);
+		value = read_buf[0] << 8 | read_buf[1];
+		if (value > 0){
+			value = abs(value);
+			TIM1->CCR1 = 0;
+			TIM1->CCR2 = value;
+		}else{
+			value = abs(value);
+			TIM1->CCR2 = 0;
+			TIM1->CCR1 = value;
+		}
 	}
-	return 0;
 }
 /* USER CODE END 0 */
 
@@ -293,9 +302,9 @@ int main(void)
 //	  }
 //	  HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
 //	  HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
-//	  TIM1->CCR1 = 60000; // higher is faster
+//	  TIM1->CCR1 = 13107; // higher is faster
 //	  TIM1->CCR2 = 0; // higher is faster
-    memset(read_buf, 0, sizeof(read_buf));
+//    memset(read_buf, 0, sizeof(read_buf));
     HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
     if ((uint8_t)read_buf[0] == 0x42){
     	calibration();
@@ -409,7 +418,7 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSE;
   RCC_OscInitStruct.PLL.PLLM = 4;
   RCC_OscInitStruct.PLL.PLLN = 96;
-  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV6;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
   RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
@@ -421,11 +430,11 @@ void SystemClock_Config(void)
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
   RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV2;
+  RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
   RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
-  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV2;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
   {
     Error_Handler();
   }
