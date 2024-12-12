@@ -133,9 +133,17 @@ uint16_t calc_crc16_checksum(WheelSystemState buffer){
 	}
 	return crc;
 }
-
+uint16_t center = 0;
+uint16_t delta = 0;
+uint16_t left_max = 0;
+uint16_t right_max = 0;
+uint16_t break_start = 4100;
+uint16_t break_end = 1250;
+uint16_t acceleration_start = 4100;
+uint16_t acceleration_end = 1250;
 void send_to_pc(WheelSystemState *state){
 	uint8_t buffer[9];
+
 	buffer[0] = (uint8_t)'S';
 	memcpy(&buffer[1], &state->rotation, 2);
 
@@ -162,14 +170,55 @@ void send_to_pc(WheelSystemState *state){
  }
 uint16_t wheel[3];
 void calibration(){
-	uint8_t buffer[7];
-	HAL_ADC_Start_DMA(&hadc1, wheel, 3);
-	memcpy(&buffer[0], &wheel[0], 2);
-	memcpy(&buffer[2], &wheel[1], 2);
-	memcpy(&buffer[4], &wheel[2], 2);
-	buffer[6] = HAL_GPIO_ReadPin(left_stopper_GPIO_Port, left_stopper_Pin) ? 0 : 1;
-	buffer[6] += HAL_GPIO_ReadPin(right_stopper_GPIO_Port, right_stopper_Pin) ? 0 : 2;
-	HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), HAL_MAX_DELAY);
+	uint8_t flag1 = 0;
+	uint8_t flag2 = 0;
+	uint8_t buffer[4];
+	int left_stopper;
+	int right_stopper;
+	HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
+	HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
+//	TIM1->CCR1 = 0;
+//	TIM1->CCR2 = 5000;
+	while(1 == 1){
+	    HAL_ADC_Start_DMA(&hadc1, wheel, 3);
+		left_stopper = HAL_GPIO_ReadPin(left_stopper_GPIO_Port, left_stopper_Pin);
+		right_stopper = HAL_GPIO_ReadPin(right_stopper_GPIO_Port, right_stopper_Pin);
+		if (left_stopper == 0 && right_stopper == 1){
+			flag1 = 1;
+//			right_max = wheel[0] - 200;
+			TIM1->CCR2 = 0;
+			TIM1->CCR1 = 0;
+			HAL_Delay(100);
+			HAL_ADC_Start_DMA(&hadc1, wheel, 3);
+			wheel[0] += 10;
+			memcpy(&buffer[0], &(wheel[0]), 2);
+			HAL_Delay(100);
+//			TIM1->CCR2 = 0;
+//			TIM1->CCR1 = 5000;
+
+		}else if(left_stopper == 1 && right_stopper == 0){
+			flag2 = 1;
+//			left_max = wheel[0]  +200;
+			TIM1->CCR2= 0 ;
+			TIM1->CCR1 = 0;
+			HAL_Delay(100);
+			HAL_ADC_Start_DMA(&hadc1, wheel, 3);
+			wheel[0] -= 10;
+			memcpy(&buffer[2], &(wheel[0]), 2);
+			HAL_Delay(100);
+//			TIM1->CCR2 = 0;
+//			TIM1->CCR1 = 5000;
+		}
+		if (flag1 == 1 && flag2 == 1){
+//			TIM1->CCR1 = 0;
+//			TIM1->CCR2 = 0;
+			HAL_UART_Transmit(&huart2, buffer, sizeof(buffer), HAL_MAX_DELAY);
+			return;
+
+		}
+		left_stopper = 0;
+		right_stopper = 0;
+	}
 
 }
 void dim(){
@@ -191,8 +240,7 @@ enum effect_type{
 	FRICTION = 0x03
 };
 void ffb_handler(WheelSystemState state){
-	HAL_GPIO_WritePin(left_en_GPIO_Port, left_en_Pin, 1);
-	HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
+
 	uint8_t read_buf[1];
 	HAL_UART_Receive(&huart2, read_buf, 1, HAL_MAX_DELAY);
 	if (read_buf[0] == CONSTANT_FORCE){
@@ -200,6 +248,7 @@ void ffb_handler(WheelSystemState state){
 		uint8_t magn_buffer[2];
 		HAL_UART_Receive(&huart2, magn_buffer, 2, HAL_MAX_DELAY);
 		value = magn_buffer[0] << 8 | magn_buffer[1];
+		value = value / 3; // scale to 6 %
 		if (value > 0){
 			value = abs(value);
 			TIM1->CCR1 = 0;
@@ -280,6 +329,7 @@ int main(void)
   ADC_ChannelConfTypeDef ADC_CH_Cfg = {0};
   uint32_t ADC_Channels[3] = {ADC_CHANNEL_1, ADC_CHANNEL_14, ADC_CHANNEL_15};
 
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -288,6 +338,7 @@ int main(void)
   uint8_t read_buf[1];
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_2);
   HAL_TIM_PWM_Start(&htim1, TIM_CHANNEL_1);
+//  calibration();
   while (1)
   {
     /* USER CODE END WHILE */
@@ -304,7 +355,7 @@ int main(void)
 //	  HAL_GPIO_WritePin(right_en_GPIO_Port, right_en_Pin, 1);
 //	  TIM1->CCR1 = 13107; // higher is faster
 //	  TIM1->CCR2 = 0; // higher is faster
-//    memset(read_buf, 0, sizeof(read_buf));
+    memset(read_buf, 0, sizeof(read_buf));
     HAL_UART_Receive(&huart2, read_buf, sizeof(read_buf), 1000);
     if ((uint8_t)read_buf[0] == 0x42){
     	calibration();
